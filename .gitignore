@@ -1,0 +1,43 @@
+# Virtual environment folders
+env/
+venv/
+.venv/
+crew_env/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+.env.*
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+*.db3
+*.sql
+*.bak
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VS Code settings
+.vscode/
+
+# macOS system files
+.DS_Store
+
+# Logs
+*.log
+
+# Cache
+.cache/
+*.egg-info/
+dist/
+build/
+
+# Pip wheel cache
+pip-wheel-metadata/
