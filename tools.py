@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 
 class RAGConfig:
     def __init__(self):
-        self.chunk_size = 1000
-        self.chunk_overlap = 200
+        self.chunk_size = 500
+        self.chunk_overlap = 100
         self.top_k = 2
         self.pdf_path = '/Users/omkarsatapaphy/Downloads/Apple Laptop FAQ.pdf'
         self.min_paragraph_length = 50

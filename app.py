@@ -74,6 +74,10 @@ def run_streamlit():
         st.session_state.messages = []
     if 'session_id' not in st.session_state:
         st.session_state.session_id = str(uuid.uuid4())[:8]
+    if 'processing_message' not in st.session_state:
+        st.session_state.processing_message = False
+    if 'pending_message' not in st.session_state:
+        st.session_state.pending_message = None
     
     with st.sidebar:
         st.markdown("""
@@ -87,6 +91,8 @@ def run_streamlit():
             clear_session()
             st.session_state.session_id = str(uuid.uuid4())[:8]
             st.session_state.messages = []
+            st.session_state.processing_message = False
+            st.session_state.pending_message = None
             st.rerun()
     
     chat_container = st.container()
@@ -128,79 +134,104 @@ def run_streamlit():
     
     user_input = st.chat_input("Type your message here...")
     
-    if user_input:
+    # Handle new user input
+    if user_input and not st.session_state.processing_message:
+        # Immediately add user message and set up for processing
         st.session_state.messages.append(("user", user_input))
-        
-        response_placeholder = st.empty()
-        response_text = ""
-        
-        try:
-            # Print the HTTP request details
-            request_url = "http://localhost:5001/chat"
-            request_payload = {
-                "message": user_input,
-                "session_id": st.session_state.session_id
-            }
-            
-            print("\n" + "="*60)
-            print("FRONTEND → API HTTP REQUEST")
-            print("="*60)
-            print(f"URL: {request_url}")
-            print(f"Method: POST")
-            print(f"Headers: Content-Type: application/json")
-            print(f"Payload: {json.dumps(request_payload, indent=2)}")
-            print("="*60)
-            
-            response = requests.post(
-                request_url,
-                json=request_payload,
-                timeout=30
-            )
-            
-            print(f"RESPONSE STATUS: {response.status_code}")
-            print(f"RESPONSE SIZE: {len(response.content)} bytes")
-            print("="*60 + "\n")
-            
-            if response.status_code == 200:
-                data = response.json()
-                full_response = data.get('response', 'No response received')
-                
-                for char in full_response:
-                    response_text += char
-                    with response_placeholder.container():
-                        if bot_icon:
-                            st.markdown(f"""
-                            <div class="chat-message bot-message">
-                                <img src="data:image/png;base64,{bot_icon}" class="icon-img bot-icon">
-                                <strong>Lumi:</strong><br>
-                                <div style="margin-left: 70px;">{response_text}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"""
-                            <div class="chat-message bot-message">
-                                <strong>Lumi:</strong><br>
-                                {response_text}
-                            </div>
-                            """, unsafe_allow_html=True)
-                    time.sleep(0.02)
-                
-                st.session_state.messages.append(("assistant", full_response))
-            else:
-                error_msg = f"Error: {response.status_code}"
-                st.session_state.messages.append(("assistant", error_msg))
-                
-        except requests.exceptions.ConnectionError:
-            error_msg = "Cannot connect to AI agent. Please ensure the API is running."
-            st.session_state.messages.append(("assistant", error_msg))
-        except requests.exceptions.Timeout:
-            error_msg = "Request timed out. Please try again."
-            st.session_state.messages.append(("assistant", error_msg))
-        except Exception as e:
-            error_msg = f"Error: {str(e)}"
-            st.session_state.messages.append(("assistant", error_msg))
-        
+        st.session_state.pending_message = user_input
+        st.session_state.processing_message = True
         st.rerun()
+    
+    # Process pending message (this runs after rerun when user message is visible)
+    if st.session_state.processing_message and st.session_state.pending_message:
+        process_bot_response(st.session_state.pending_message)
+
+def process_bot_response(user_message):
+    """Process the bot response after user message is displayed"""
+    
+    def load_icon(icon_name):
+        try:
+            with open(f"icons/{icon_name}", "rb") as f:
+                import base64
+                return base64.b64encode(f.read()).decode()
+        except:
+            return None
+
+    bot_icon = load_icon("bot.png")
+    
+    response_placeholder = st.empty()
+    response_text = ""
+    
+    try:
+        # Print the HTTP request details
+        request_url = "http://localhost:5001/chat"
+        request_payload = {
+            "message": user_message,
+            "session_id": st.session_state.session_id
+        }
+        
+        print("\n" + "="*60)
+        print("FRONTEND → API HTTP REQUEST")
+        print("="*60)
+        print(f"URL: {request_url}")
+        print(f"Method: POST")
+        print(f"Headers: Content-Type: application/json")
+        print(f"Payload: {json.dumps(request_payload, indent=2)}")
+        print("="*60)
+        
+        response = requests.post(
+            request_url,
+            json=request_payload,
+            timeout=30
+        )
+        
+        print(f"RESPONSE STATUS: {response.status_code}")
+        print(f"RESPONSE SIZE: {len(response.content)} bytes")
+        print("="*60 + "\n")
+        
+        if response.status_code == 200:
+            data = response.json()
+            full_response = data.get('response', 'No response received')
+            
+            for char in full_response:
+                response_text += char
+                with response_placeholder.container():
+                    if bot_icon:
+                        st.markdown(f"""
+                        <div class="chat-message bot-message">
+                            <img src="data:image/png;base64,{bot_icon}" class="icon-img bot-icon">
+                            <strong>Lumi:</strong><br>
+                            <div style="margin-left: 70px;">{response_text}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                        <div class="chat-message bot-message">
+                            <strong>Lumi:</strong><br>
+                            {response_text}
+                        </div>
+                        """, unsafe_allow_html=True)
+                time.sleep(0.02)
+            
+            st.session_state.messages.append(("assistant", full_response))
+        else:
+            error_msg = f"Error: {response.status_code}"
+            st.session_state.messages.append(("assistant", error_msg))
+            
+    except requests.exceptions.ConnectionError:
+        error_msg = "Cannot connect to AI agent. Please ensure the API is running."
+        st.session_state.messages.append(("assistant", error_msg))
+    except requests.exceptions.Timeout:
+        error_msg = "Request timed out. Please try again."
+        st.session_state.messages.append(("assistant", error_msg))
+    except Exception as e:
+        error_msg = f"Error: {str(e)}"
+        st.session_state.messages.append(("assistant", error_msg))
+    
+    # Clear processing flags
+    st.session_state.processing_message = False
+    st.session_state.pending_message = None
+    st.rerun()
 
 def clear_session():
     try:
