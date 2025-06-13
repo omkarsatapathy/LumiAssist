@@ -25,6 +25,65 @@ def run_streamlit():
     
     st.markdown("""
     <style>
+    .main-title {
+        text-align: center;
+        padding: 1rem 0 0.8rem 0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 16px rgba(31, 38, 135, 0.25);
+        backdrop-filter: blur(4px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .main-title h1 {
+        margin: 0;
+        font-size: 1.4rem;
+        font-weight: 500;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.15);
+    }
+    .main-title .subtitle {
+        font-size: 0.8rem;
+        opacity: 0.75;
+        margin-top: 0.2rem;
+    }
+    .lumi-icon-main {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        margin: 0 auto 0.5rem auto;
+        display: block;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+        100% { transform: translateY(0px); }
+    }
+    @keyframes slideInLeft {
+        from { transform: translateX(-100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes fadeInUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    .stApp {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-attachment: fixed;
+    }
+    .main .block-container {
+        background: rgba(90, 90, 192, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+    }
     .chat-message {
         padding: 1.2rem;
         margin: 0.8rem 0;
@@ -33,31 +92,59 @@ def run_streamlit():
         font-size: 16px;
         line-height: 1.5;
         max-width: 70%;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
     }
     .user-message {
-        background-color: #3d4f42;
+        background: linear-gradient(135deg, #5A5AC0 0%, #4A4AAF 100%);
         border-left: 4px solid #4caf50;
         margin-left: auto;
         margin-right: 2rem;
         text-align: right;
     }
     .bot-message {
-        background-color: #3a4854;
+        background: linear-gradient(135deg, #3a4854 0%, #2d3748 100%);
         border-left: 4px solid #26a69a;
         margin-left: 2rem;
         margin-right: auto;
         text-align: left;
     }
+    .user-message-new {
+        background: linear-gradient(135deg, #5A5AC0 0%, #4A4AAF 100%);
+        border-left: 4px solid #4caf50;
+        margin-left: auto;
+        margin-right: 2rem;
+        text-align: right;
+        animation: slideInRight 0.5s ease-out;
+    }
+    .bot-message-new {
+        background: linear-gradient(135deg, #3a4854 0%, #2d3748 100%);
+        border-left: 4px solid #26a69a;
+        margin-left: 2rem;
+        margin-right: auto;
+        text-align: left;
+        animation: slideInLeft 0.5s ease-out;
+    }
     .sidebar-bot {
         text-align: center;
         padding: 1rem;
         margin-bottom: 2rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    .sidebar-bot h2 {
+        margin: 0.5rem 0;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
     }
     .icon-img {
         width: 60px;
         height: 60px;
         border-radius: 50%;
         margin-bottom: 0.5rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     }
     .user-icon {
         float: right;
@@ -66,6 +153,15 @@ def run_streamlit():
     .bot-icon {
         float: left;
         margin-right: 20px;
+    }
+    .chat-container {
+        animation: fadeInUp 0.8s ease-out;
+    }
+    .stChatInput > div {
+        background: rgba(90, 90, 192, 0.2) !important;
+        border-radius: 25px !important;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -78,14 +174,25 @@ def run_streamlit():
         st.session_state.processing_message = False
     if 'pending_message' not in st.session_state:
         st.session_state.pending_message = None
+    if 'last_message_count' not in st.session_state:
+        st.session_state.last_message_count = 0
     
     with st.sidebar:
-        st.markdown("""
-        <div class="sidebar-bot">
-            <h2>Lumi AI</h2>
-            <p><em>Apple Support Assistant</em></p>
-        </div>
-        """, unsafe_allow_html=True)
+        if bot_icon:
+            st.markdown(f"""
+            <div class="sidebar-bot">
+                <img src="data:image/png;base64,{bot_icon}" class="icon-img">
+                <h2>Lumi AI</h2>
+                <p><em>Apple Support Assistant</em></p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="sidebar-bot">
+                <h2>Lumi AI</h2>
+                <p><em>Apple Support Assistant</em></p>
+            </div>
+            """, unsafe_allow_html=True)
         
         if st.button("New Session", type="primary", use_container_width=True):
             clear_session()
@@ -93,16 +200,42 @@ def run_streamlit():
             st.session_state.messages = []
             st.session_state.processing_message = False
             st.session_state.pending_message = None
+            st.session_state.last_message_count = 0
             st.rerun()
+    
+    # Beautiful main header
+    if bot_icon:
+        st.markdown(f"""
+        <div class="main-title">
+            <img src="data:image/png;base64,{bot_icon}" class="lumi-icon-main">
+            <h1>Lumi: The Apple Assistant!</h1>
+            <div class="subtitle">Your intelligent support companion for all Apple laptop needs</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div class="main-title">
+            <h1>🤖 Lumi: The Apple Assistant!</h1>
+            <div class="subtitle">Your intelligent support companion for all Apple laptop needs</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     chat_container = st.container()
     
     with chat_container:
-        for role, message in st.session_state.messages:
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        current_count = len(st.session_state.messages)
+        
+        for i, (role, message) in enumerate(st.session_state.messages):
+            # Determine if this message should animate (new message)
+            # Bot messages should never animate in final chat history (they already animated during streaming)
+            is_new_message = i >= st.session_state.last_message_count and role == "user"
+            
             if role == "user":
+                message_class = "user-message-new" if is_new_message else "user-message"
                 if human_icon:
                     st.markdown(f"""
-                    <div class="chat-message user-message">
+                    <div class="chat-message {message_class}">
                         <img src="data:image/png;base64,{human_icon}" class="icon-img user-icon">
                         <strong>You:</strong><br>
                         <div style="margin-right: 70px; text-align: right;">{message}</div>
@@ -110,12 +243,13 @@ def run_streamlit():
                     """, unsafe_allow_html=True)
                 else:
                     st.markdown(f"""
-                    <div class="chat-message user-message">
+                    <div class="chat-message {message_class}">
                         <strong>You:</strong><br>
                         {message}
                     </div>
                     """, unsafe_allow_html=True)
             else:
+                # Bot messages always use non-animated class in final chat history
                 if bot_icon:
                     st.markdown(f"""
                     <div class="chat-message bot-message">
@@ -131,6 +265,10 @@ def run_streamlit():
                         {message}
                     </div>
                     """, unsafe_allow_html=True)
+        
+        # Update the last message count after rendering
+        st.session_state.last_message_count = current_count
+        st.markdown('</div>', unsafe_allow_html=True)
     
     user_input = st.chat_input("Type your message here...")
     
@@ -198,7 +336,7 @@ def process_bot_response(user_message):
                 with response_placeholder.container():
                     if bot_icon:
                         st.markdown(f"""
-                        <div class="chat-message bot-message">
+                        <div class="chat-message bot-message-new">
                             <img src="data:image/png;base64,{bot_icon}" class="icon-img bot-icon">
                             <strong>Lumi:</strong><br>
                             <div style="margin-left: 70px;">{response_text}</div>
@@ -206,12 +344,12 @@ def process_bot_response(user_message):
                         """, unsafe_allow_html=True)
                     else:
                         st.markdown(f"""
-                        <div class="chat-message bot-message">
+                        <div class="chat-message bot-message-new">
                             <strong>Lumi:</strong><br>
                             {response_text}
                         </div>
                         """, unsafe_allow_html=True)
-                time.sleep(0.02)
+                time.sleep(0.01)
             
             st.session_state.messages.append(("assistant", full_response))
         else:
