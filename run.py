@@ -5,6 +5,7 @@ import time
 import os
 import threading
 from dotenv import load_dotenv
+from pymongo import MongoClient
 
 def check_environment():
     print("Checking Environment...")
@@ -18,6 +19,15 @@ def check_environment():
         return False
     
     print("OpenAI API key found")
+    
+    try:
+        client = MongoClient('mongodb://localhost:27017/', serverSelectionTimeoutMS=2000)
+        client.server_info()
+        print("MongoDB connection successful")
+    except Exception as e:
+        print(f"MongoDB connection failed: {e}")
+        print("Please ensure MongoDB is running on localhost:27017")
+        return False
     
     pdf_path = '/Users/omkarsatapaphy/Downloads/Apple Laptop FAQ.pdf'
     if not os.path.exists(pdf_path):

@@ -1,11 +1,11 @@
 import PyPDF2
 import re
 import uuid
-import sqlite3
 import json
 from datetime import datetime
 from langchain.tools import tool
 from pydantic import BaseModel, Field
+from pymongo import MongoClient
 
 class RAGConfig:
     def __init__(self):
@@ -26,32 +26,19 @@ class ComplaintRetrievalInput(BaseModel):
 
 rag_config = RAGConfig()
 
-def init_db():
-    conn = sqlite3.connect('complaints.db')
-    cursor = conn.cursor()
-    
-    cursor.execute("PRAGMA table_info(complaints)")
-    columns = [column[1] for column in cursor.fetchall()]
-    
-    if 'complaints' not in [table[0] for table in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]:
-        cursor.execute('''
-            CREATE TABLE complaints (
-                complaint_id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                phone_number TEXT NOT NULL,
-                email TEXT NOT NULL,
-                complaint_details TEXT NOT NULL,
-                status TEXT DEFAULT 'created',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-    elif 'status' not in columns:
-        cursor.execute('ALTER TABLE complaints ADD COLUMN status TEXT DEFAULT "created"')
-    
-    conn.commit()
-    conn.close()
+def get_mongo_client():
+    client = MongoClient('mongodb://localhost:27017/')
+    return client.complaints_db.complaints
 
-@tool("rag_faq_search", args_schema=RAGSearchInput, return_direct=False)
+def init_db():
+    try:
+        collection = get_mongo_client()
+        collection.create_index("complaint_id", unique=True)
+        print("MongoDB connection established")
+    except Exception as e:
+        print(f"MongoDB connection error: {e}")
+
+@tool
 def rag_faq_search(query: str) -> str:
     """Search Apple Laptop FAQ for relevant information"""
     try:
@@ -83,7 +70,7 @@ def rag_faq_search(query: str) -> str:
     except Exception as e:
         return f"Error accessing FAQ: {str(e)}"
 
-@tool("create_complaint", args_schema=ComplaintInput, return_direct=False)
+@tool
 def create_complaint(complaint_data: str) -> str:
     """Create a new complaint from extracted customer information"""
     try:
@@ -103,32 +90,28 @@ def create_complaint(complaint_data: str) -> str:
         if len(phone_clean) != 10:
             return "Invalid phone number. Must be 10 digits."
         
-        db_data = {
+        complaint_id = str(uuid.uuid4()).replace('-', '')[:8].upper()
+        
+        document = {
+            "complaint_id": complaint_id,
             "name": info['name'],
             "phone_number": phone_clean,
             "email": info['email'],
-            "complaint_details": info['complaint_details']
+            "complaint_details": info['complaint_details'],
+            "status": "created",
+            "created_at": datetime.now()
         }
         
         print("\n" + "="*60)
-        print("DATABASE INSERT DATA:")
+        print("MONGODB INSERT DOCUMENT:")
         print("="*60)
-        print(json.dumps(db_data, indent=2))
+        print(json.dumps(document, indent=2, default=str))
         print("="*60 + "\n")
         
-        complaint_id = str(uuid.uuid4()).replace('-', '')[:8].upper()
+        collection = get_mongo_client()
+        result = collection.insert_one(document)
         
-        init_db()
-        conn = sqlite3.connect('complaints.db')
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO complaints (complaint_id, name, phone_number, email, complaint_details, status)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (complaint_id, info['name'], phone_clean, info['email'], info['complaint_details'], 'created'))
-        conn.commit()
-        conn.close()
-        
-        print(f"✅ SUCCESS: Complaint {complaint_id} created in database\n")
+        print(f"✅ SUCCESS: Complaint {complaint_id} created in MongoDB\n")
         
         response_json = {
             "complaint_id": complaint_id,
@@ -145,38 +128,34 @@ def create_complaint(complaint_data: str) -> str:
         print(f"ERROR: Failed to create complaint - {str(e)}\n")
         return f"Error creating complaint: {str(e)}"
 
-@tool("retrieve_complaint", args_schema=ComplaintRetrievalInput, return_direct=False)
+@tool
 def retrieve_complaint(complaint_id: str) -> str:
     """Retrieve complaint details by ID"""
     try:
-        init_db()
-        conn = sqlite3.connect('complaints.db')
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM complaints WHERE complaint_id = ?', (complaint_id,))
-        result = cursor.fetchone()
-        conn.close()
+        collection = get_mongo_client()
+        result = collection.find_one({"complaint_id": complaint_id})
         
         if not result:
             return f"No complaint found with ID: {complaint_id}"
         
         response_json = {
-            "complaint_id": result[0],
-            "name": result[1],
-            "phone_number": result[2],
-            "email": result[3],
-            "complaint_details": result[4],
-            "status": result[5],
-            "created_at": result[6]
+            "complaint_id": result['complaint_id'],
+            "name": result['name'],
+            "phone_number": result['phone_number'],
+            "email": result['email'],
+            "complaint_details": result['complaint_details'],
+            "status": result['status'],
+            "created_at": str(result['created_at'])
         }
         
         return f"""Complaint Details Found:
-                ID: {result[0]}
-                Name: {result[1]}
-                Phone: {result[2]}
-                Email: {result[3]}
-                Issue: {result[4]}
-                Status: {result[5]}
-                Created: {result[6]}
+                ID: {result['complaint_id']}
+                Name: {result['name']}
+                Phone: {result['phone_number']}
+                Email: {result['email']}
+                Issue: {result['complaint_details']}
+                Status: {result['status']}
+                Created: {result['created_at']}
 
                 JSON_START{json.dumps(response_json)}JSON_END"""
         
