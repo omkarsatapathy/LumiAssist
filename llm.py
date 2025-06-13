@@ -13,20 +13,20 @@ class LLMConfig:
         self.model = ChatOpenAI(
             model="gpt-3.5-turbo",
             temperature=0.3,
-            openai_api_key=self.api_key
+            openai_api_key=self.api_key,
+            streaming=True
         )
     
     def get_llm(self):
         return self.model
     
-    def generate_response(self, prompt: str) -> str:
-        """Generate response using LLM"""
+    def stream_response(self, prompt: str):
         try:
-            response = self.model.invoke(prompt)
-            return response.content
+            for chunk in self.model.stream(prompt):
+                if hasattr(chunk, 'content'):
+                    yield chunk.content
         except Exception as e:
-            return f"I apologize, but I encountered an error: {str(e)}"
-
+            yield f"Error: {str(e)}"
 
 llm_config = LLMConfig()
 llm = llm_config.get_llm()

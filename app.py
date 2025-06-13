@@ -2,9 +2,9 @@ import streamlit as st
 import requests
 import json
 import uuid
+import time
 
 def run_streamlit():
-
     st.set_page_config(
         page_title="Lumi - Apple Support AI",
         page_icon="🤖",
@@ -25,14 +25,6 @@ def run_streamlit():
     
     st.markdown("""
     <style>
-    .main-header {
-        text-align: center;
-        padding: 1rem 0;
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 10px;
-        margin-bottom: 2rem;
-    }
     .chat-message {
         padding: 1.2rem;
         margin: 0.8rem 0;
@@ -40,16 +32,21 @@ def run_streamlit():
         color: #e8e8e8;
         font-size: 16px;
         line-height: 1.5;
+        max-width: 70%;
     }
     .user-message {
         background-color: #3d4f42;
         border-left: 4px solid #4caf50;
-        margin-left: 20px;
+        margin-left: auto;
+        margin-right: 2rem;
+        text-align: right;
     }
     .bot-message {
         background-color: #3a4854;
         border-left: 4px solid #26a69a;
-        margin-right: 20px;
+        margin-left: 2rem;
+        margin-right: auto;
+        text-align: left;
     }
     .sidebar-bot {
         text-align: center;
@@ -61,6 +58,14 @@ def run_streamlit():
         height: 60px;
         border-radius: 50%;
         margin-bottom: 0.5rem;
+    }
+    .user-icon {
+        float: right;
+        margin-left: 20px;
+    }
+    .bot-icon {
+        float: left;
+        margin-right: 20px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -79,20 +84,10 @@ def run_streamlit():
         """, unsafe_allow_html=True)
         
         if st.button("New Session", type="primary", use_container_width=True):
-            try:
-                requests.post(f"http://localhost:5001/session/{st.session_state.session_id}/clear")
-            except:
-                pass
+            clear_session()
             st.session_state.session_id = str(uuid.uuid4())[:8]
             st.session_state.messages = []
             st.rerun()
-    
-    # st.markdown("""
-    # <div class="main-header">
-    #     <h3>Lumi - Apple Support Assistant</h3>
-    #     <p>I can help with technical questions and create support complaints</p>
-    # </div>
-    # """, unsafe_allow_html=True)
     
     chat_container = st.container()
     
@@ -102,15 +97,15 @@ def run_streamlit():
                 if human_icon:
                     st.markdown(f"""
                     <div class="chat-message user-message">
-                        <img src="data:image/png;base64,{human_icon}" class="icon-img" style="float: left; margin-right: 20px;">
+                        <img src="data:image/png;base64,{human_icon}" class="icon-img user-icon">
                         <strong>You:</strong><br>
-                        <div style="margin-left: 70px;">{message}</div>
+                        <div style="margin-right: 70px; text-align: right;">{message}</div>
                     </div>
                     """, unsafe_allow_html=True)
                 else:
                     st.markdown(f"""
                     <div class="chat-message user-message">
-                        <strong> You:</strong><br>
+                        <strong>You:</strong><br>
                         {message}
                     </div>
                     """, unsafe_allow_html=True)
@@ -118,7 +113,7 @@ def run_streamlit():
                 if bot_icon:
                     st.markdown(f"""
                     <div class="chat-message bot-message">
-                        <img src="data:image/png;base64,{bot_icon}" class="icon-img" style="float: left; margin-right: 20px;">
+                        <img src="data:image/png;base64,{bot_icon}" class="icon-img bot-icon">
                         <strong>Lumi:</strong><br>
                         <div style="margin-left: 70px;">{message}</div>
                     </div>
@@ -126,7 +121,7 @@ def run_streamlit():
                 else:
                     st.markdown(f"""
                     <div class="chat-message bot-message">
-                        <strong> Lumi:</strong><br>
+                        <strong>Lumi:</strong><br>
                         {message}
                     </div>
                     """, unsafe_allow_html=True)
@@ -136,58 +131,82 @@ def run_streamlit():
     if user_input:
         st.session_state.messages.append(("user", user_input))
         
-        with st.spinner("Lumi ..."):
-            response = send_message(user_input)
+        response_placeholder = st.empty()
+        response_text = ""
         
-        st.session_state.messages.append(("assistant", response))
-        st.rerun()
-    
-    # with st.expander("How to Use Lumi"):
-    #     st.markdown("""
-    #     **Lumi is an intelligent AI that can:**
-        
-    #     **Answer Technical Questions**
-    #     - "How do I check battery health?"
-    #     - "My MacBook runs slow, what should I do?"
-        
-    #     **Create Support Complaints**
-    #     - Provide all details in one message: name, phone, email, and issue description
-    #     - Example: "Hi, I'm Sarah Johnson, phone 9876543210, email sarah@email.com. My MacBook Pro screen flickers constantly and sometimes goes black."
-        
-    #     **Retrieve Complaint Status**
-    #     - "Show me complaint ABC12345"
-    #     - "Check status of complaint XYZ67890"
-        
-    #     **Tips:**
-    #     - Be specific about your issue
-    #     - For complaints, include all your details in one message
-    #     - Lumi thinks before responding - no generic answers!
-    #     """)
-
-def send_message(message: str) -> str:
-    try:
-        response = requests.post(
-            "http://localhost:5001/chat",
-            json={
-                "message": message,
+        try:
+            # Print the HTTP request details
+            request_url = "http://localhost:5001/chat"
+            request_payload = {
+                "message": user_input,
                 "session_id": st.session_state.session_id
-            },
-            timeout=30
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            return data.get('response', 'No response received')
-        else:
-            return f"Error: {response.status_code}"
+            }
             
-    except requests.exceptions.ConnectionError:
-        return "Cannot connect to AI agent. Starting up..."
-    except requests.exceptions.Timeout:
-        return "Request timed out. Please try again."
-    except Exception as e:
-        return f"Error: {str(e)}"
+            print("\n" + "="*60)
+            print("FRONTEND → API HTTP REQUEST")
+            print("="*60)
+            print(f"URL: {request_url}")
+            print(f"Method: POST")
+            print(f"Headers: Content-Type: application/json")
+            print(f"Payload: {json.dumps(request_payload, indent=2)}")
+            print("="*60)
+            
+            response = requests.post(
+                request_url,
+                json=request_payload,
+                timeout=30
+            )
+            
+            print(f"RESPONSE STATUS: {response.status_code}")
+            print(f"RESPONSE SIZE: {len(response.content)} bytes")
+            print("="*60 + "\n")
+            
+            if response.status_code == 200:
+                data = response.json()
+                full_response = data.get('response', 'No response received')
+                
+                for char in full_response:
+                    response_text += char
+                    with response_placeholder.container():
+                        if bot_icon:
+                            st.markdown(f"""
+                            <div class="chat-message bot-message">
+                                <img src="data:image/png;base64,{bot_icon}" class="icon-img bot-icon">
+                                <strong>Lumi:</strong><br>
+                                <div style="margin-left: 70px;">{response_text}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"""
+                            <div class="chat-message bot-message">
+                                <strong>Lumi:</strong><br>
+                                {response_text}
+                            </div>
+                            """, unsafe_allow_html=True)
+                    time.sleep(0.02)
+                
+                st.session_state.messages.append(("assistant", full_response))
+            else:
+                error_msg = f"Error: {response.status_code}"
+                st.session_state.messages.append(("assistant", error_msg))
+                
+        except requests.exceptions.ConnectionError:
+            error_msg = "Cannot connect to AI agent. Please ensure the API is running."
+            st.session_state.messages.append(("assistant", error_msg))
+        except requests.exceptions.Timeout:
+            error_msg = "Request timed out. Please try again."
+            st.session_state.messages.append(("assistant", error_msg))
+        except Exception as e:
+            error_msg = f"Error: {str(e)}"
+            st.session_state.messages.append(("assistant", error_msg))
+        
+        st.rerun()
 
+def clear_session():
+    try:
+        requests.post(f"http://localhost:5001/session/{st.session_state.session_id}/clear")
+    except:
+        pass
 
 def main():
     run_streamlit()

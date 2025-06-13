@@ -2,34 +2,28 @@ from langchain.agents import create_openai_functions_agent, AgentExecutor
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.memory import ConversationBufferMemory
 from llm import llm
-from tools import available_tools, extract_complaint_id
-import re
+from tools import available_tools
+import json
 
 class LumiAgent:
     def __init__(self):
         self.llm = llm
         
-        # System prompt for intelligent agent
-        system_prompt = """You are Lumi, an intelligent AI assistant for Apple laptop customer support.
+        system_prompt = """You are Lumi, an intelligent Apple laptop support assistant.
 
-Your capabilities:
-1. Search FAQ knowledge base for technical questions and troubleshooting
-2. Create customer complaints when issues can't be resolved
-3. Retrieve complaint details when customers provide complaint IDs
+Your role is to help customers by:
+1. Answering technical questions using the FAQ search tool
+2. Creating support tickets when customers have unresolved issues
+3. Retrieving ticket information when customers provide ticket IDs
 
-Decision-making process:
-- If user asks technical questions, search FAQ first using rag_faq_search tool
-- If FAQ doesn't have the answer or user wants to file complaint, use create_complaint tool
-- If user mentions a complaint ID (8-character alphanumeric), use retrieve_complaint tool
+Decision guidelines:
+- For technical questions, search the FAQ first
+- If FAQ doesn't resolve the issue OR customer explicitly wants to file a complaint/ticket, create one
+- If customer mentions an 8-character alphanumeric ID, retrieve that ticket
+- When creating tickets, ensure you have: name, phone, email, and issue description
+- Always be professional and helpful
 
-Guidelines:
-- Always think about the user's intent before responding
-- Be empathetic and professional
-- Provide complete, helpful responses
-- When creating complaints, ensure you have all required info: name, phone, email, complaint details
-- If information is missing, ask the user to provide all details in one message
-
-Remember: Every response should be thoughtful and contextual. No generic or static responses."""
+You decide when to create tickets based on customer needs, not keywords."""
 
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
@@ -47,7 +41,6 @@ Remember: Every response should be thoughtful and contextual. No generic or stat
         self.sessions = {}
     
     def get_session(self, session_id: str):
-        """Get or create session"""
         if session_id not in self.sessions:
             memory = ConversationBufferMemory(
                 memory_key="chat_history",
@@ -71,58 +64,44 @@ Remember: Every response should be thoughtful and contextual. No generic or stat
         
         return self.sessions[session_id]
     
-    def process_message(self, user_message: str, session_id: str = "default") -> str:
-        """Process user message with intelligent decision making"""
+    def process_message(self, user_message: str, session_id: str = "default"):
         try:
             session = self.get_session(session_id)
             
-            # Let the agent think and decide what to do
             result = session['executor'].invoke({
                 "input": user_message,
                 "chat_history": session['memory'].chat_memory.messages
             })
             
-            return result['output']
+            response_text = result['output']
+            
+            # Extract and print JSON if present
+            try:
+                if '{' in response_text and '}' in response_text:
+                    # Find all JSON objects in the response
+                    import re
+                    json_matches = re.findall(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_text)
+                    for json_str in json_matches:
+                        try:
+                            json_data = json.loads(json_str)
+                            print("\n" + "="*50)
+                            print("COMPLAINT JSON RESPONSE:")
+                            print("="*50)
+                            print(json.dumps(json_data, indent=2))
+                            print("="*50 + "\n")
+                            break
+                        except json.JSONDecodeError:
+                            continue
+            except Exception as e:
+                print(f"Error parsing JSON: {e}")
+            
+            return response_text
             
         except Exception as e:
-            # Even error responses should be contextual
-            return self._generate_error_response(str(e), user_message)
-    
-    def _generate_error_response(self, error: str, user_message: str) -> str:
-        """Generate contextual error response"""
-        try:
-            error_prompt = f"""The user said: "{user_message}"
-            
-I encountered this error: {error}
-
-Generate a helpful, empathetic response that:
-1. Acknowledges the user's request
-2. Explains there was a technical issue
-3. Offers alternative help or asks them to try again
-4. Stays in character as Lumi, the support assistant"""
-            
-            response = self.llm.invoke(error_prompt)
-            return response.content
-        except:
-            return "I apologize, but I'm experiencing technical difficulties. Please try again in a moment."
+            return f"I apologize, but I encountered a technical issue: {str(e)}. Please try again."
     
     def clear_session(self, session_id: str):
-        """Clear session"""
         if session_id in self.sessions:
             del self.sessions[session_id]
-    
-    def analyze_intent(self, message: str) -> str:
-        """Analyze user intent for debugging"""
-        complaint_id = extract_complaint_id(message)
-        
-        if complaint_id:
-            return f"COMPLAINT_RETRIEVAL: {complaint_id}"
-        
-        complaint_keywords = ['complaint', 'issue', 'problem', 'not working', 'broken', 'defective']
-        if any(keyword in message.lower() for keyword in complaint_keywords):
-            return "COMPLAINT_CREATION"
-        
-        return "FAQ_SEARCH"
-
 
 lumi_agent = LumiAgent()
