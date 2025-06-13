@@ -2,7 +2,6 @@ import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
-# Load environment variables
 load_dotenv()
 
 class LLMConfig:
@@ -28,6 +27,6 @@ class LLMConfig:
         except Exception as e:
             return f"I apologize, but I encountered an error: {str(e)}"
 
-# Global LLM instance
+
 llm_config = LLMConfig()
 llm = llm_config.get_llm()

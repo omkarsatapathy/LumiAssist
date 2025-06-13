@@ -4,7 +4,6 @@ from tools import init_db
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
@@ -20,7 +19,6 @@ def chat():
         if not user_message:
             return jsonify({'error': 'Message is required'}), 400
         
-        # Get intelligent response from agent
         response = lumi_agent.process_message(user_message, session_id)
         
         return jsonify({
@@ -60,17 +58,11 @@ def home():
     })
 
 if __name__ == '__main__':
-    # Check environment
     if not os.getenv("OPENAI_API_KEY"):
-        print("❌ OPENAI_API_KEY not found!")
+        print("OPENAI_API_KEY not found!")
         print("Please create a .env file with: OPENAI_API_KEY=your_key_here")
         exit(1)
     
-    # Initialize database
     init_db()
-    
-    print("🤖 Starting Lumi AI API...")
-    print("🔧 API will be available at: http://localhost:5001")
-    print("📄 Make sure your FAQ PDF path is correct in tools.py")
-    
+    print("API will be available at: http://localhost:5001")
     app.run(debug=True, host='0.0.0.0', port=5001)

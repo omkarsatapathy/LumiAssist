@@ -31,7 +31,6 @@ Guidelines:
 
 Remember: Every response should be thoughtful and contextual. No generic or static responses."""
 
-        # Create prompt template
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
@@ -39,14 +38,12 @@ Remember: Every response should be thoughtful and contextual. No generic or stat
             MessagesPlaceholder(variable_name="agent_scratchpad")
         ])
         
-        # Create agent
         self.agent = create_openai_functions_agent(
             llm=self.llm,
             tools=available_tools,
             prompt=self.prompt
         )
         
-        # Session storage
         self.sessions = {}
     
     def get_session(self, session_id: str):
@@ -127,5 +124,5 @@ Generate a helpful, empathetic response that:
         
         return "FAQ_SEARCH"
 
-# Global agent instance
+
 lumi_agent = LumiAgent()

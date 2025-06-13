@@ -37,7 +37,6 @@ def init_db():
 def rag_faq_search(query: str) -> str:
     """Search Apple Laptop FAQ for relevant information"""
     try:
-        # PDF path - update this to your FAQ PDF location
         pdf_path = '/Users/omkarsatapaphy/Downloads/Apple Laptop FAQ.pdf'
         
         with open(pdf_path, 'rb') as file:
@@ -47,19 +46,17 @@ def rag_faq_search(query: str) -> str:
             for page in pdf_reader.pages:
                 content += page.extract_text() + "\n"
         
-        # Search for relevant content
         query_words = query.lower().split()
         paragraphs = content.split('\n\n')
         relevant_content = []
         
         for paragraph in paragraphs:
             paragraph = paragraph.strip()
-            if len(paragraph) > 50:  # Minimum paragraph length
+            if len(paragraph) > 50: 
                 score = sum(1 for word in query_words if word in paragraph.lower())
                 if score > 0:
                     relevant_content.append((score, paragraph))
         
-        # Sort by relevance and return top results
         relevant_content.sort(key=lambda x: x[0], reverse=True)
         
         if relevant_content:
@@ -74,29 +71,23 @@ def rag_faq_search(query: str) -> str:
 def create_complaint(complaint_data: str) -> str:
     """Create a new complaint from extracted customer information"""
     try:
-        # Extract information from complaint_data
         info = extract_all_info(complaint_data)
         
-        # Validate required fields
         required_fields = ['name', 'phone_number', 'email', 'complaint_details']
         missing = [field for field in required_fields if not info.get(field)]
         
         if missing:
             return f"Missing required information: {', '.join(missing)}. Please provide all details."
         
-        # Validate email
         if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', info['email']):
             return "Invalid email format provided."
         
-        # Validate phone
         phone_clean = re.sub(r'[^\d]', '', info['phone_number'])
         if len(phone_clean) != 10:
             return "Invalid phone number. Must be 10 digits."
         
-        # Generate complaint ID
         complaint_id = str(uuid.uuid4()).replace('-', '')[:8].upper()
         
-        # Store in database
         init_db()
         conn = sqlite3.connect('complaints.db')
         cursor = conn.cursor()
@@ -141,17 +132,14 @@ def extract_all_info(text: str) -> dict:
     """Extract all customer information from text"""
     info = {}
     
-    # Extract email
     email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text)
     if email_match:
         info['email'] = email_match.group()
     
-    # Extract phone number
     phone_match = re.search(r'\b\d{10}\b|\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b', text)
     if phone_match:
         info['phone_number'] = re.sub(r'[^\d]', '', phone_match.group())
     
-    # Extract name (look for capitalized words)
     words = text.split()
     names = []
     for word in words:
@@ -162,7 +150,6 @@ def extract_all_info(text: str) -> dict:
     if names:
         info['name'] = ' '.join(names[:2])
     
-    # Rest as complaint details
     info['complaint_details'] = text
     
     return info
@@ -172,5 +159,4 @@ def extract_complaint_id(text: str) -> str:
     match = re.search(r'\b[A-F0-9]{8}\b', text.upper())
     return match.group() if match else None
 
-# List of available tools
 available_tools = [rag_faq_search, create_complaint, retrieve_complaint]
